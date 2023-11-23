@@ -1,3 +1,17 @@
+if (!('browser' in self)) {
+  self.browser = self.chrome
+}
+
+const extensionSyncStorage = browser.storage.sync
+const extensionLocalStorage = browser.storage.local
+const extensionStorage = extensionSyncStorage
+
+function createAnchorElement(url) {
+	const l = document.createElement("a")
+	l.href = url
+	return l
+}
+
 main()
 
 async function main() {
@@ -24,7 +38,7 @@ async function main() {
 				await saveCookiesToTextFile(cookies, `cookies-${currentTabHostname.replace(/\./g, '-')}.txt`, shouldPrefixHttpOnly())
 			})
 
-			const parsedDomain = await browser.runtime.sendMessage({ type: 'parseDomain', data: currentTabHostname })
+			const parsedDomain = psl.parse(currentTabHostname)
 
 			if (parsedDomain && parsedDomain.subdomain) {
 				const currentTabDomain = parsedDomain.domain
@@ -64,7 +78,8 @@ async function main() {
 async function saveCookiesToTextFile(cookieDescriptors, filename, prefixHttpOnly) {
 	const formattedCookies = cookieDescriptors.map((c) => formatCookie(c, prefixHttpOnly))
 	const fileContent = `# Netscape HTTP Cookie File\n\n${formattedCookies.join('\n')}\n`
-	await browser.runtime.sendMessage({ type: 'saveFile', data: { filename: filename, content: fileContent } })
+	const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' })
+	saveAs(blob, filename)
 }
 
 function getAllDetails({ domain = null } = {}) {
@@ -88,7 +103,7 @@ function formatCookie(c, prefixHttpOnly) {
 		c.hostOnly ? 'FALSE' : 'TRUE',
 		c.path,
 		c.secure ? 'TRUE' : 'FALSE',
-		c.session || !c.expirationDate ? 0 : c.expirationDate,
+		c.session || !c.expirationDate ? 0 : parseInt(c.expirationDate),
 		c.name,
 		c.value
 	].join('\t')
